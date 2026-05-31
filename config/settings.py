@@ -16,7 +16,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 MT5_LOGIN = int(os.getenv("MT5_LOGIN", "0"))
 MT5_PASSWORD = os.getenv("MT5_PASSWORD", "")
 MT5_SERVER = os.getenv("MT5_SERVER", "Exness-MT5Trial")
-SYMBOL = "XAUUSDm"
+SYMBOL = "XAUUSD"
 
 # ═══════════════════════════════════════════════════════
 # LLM API KEYS
@@ -24,7 +24,7 @@ SYMBOL = "XAUUSDm"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 # LLM Models
-GEMINI_MODEL_ANALYSIS = "gemini-2.5-pro"
+GEMINI_MODEL_ANALYSIS = "gemini-2.5-flash"
 GEMINI_MODEL_SPEED = "gemini-2.5-flash"
 
 # ═══════════════════════════════════════════════════════

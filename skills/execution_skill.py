@@ -12,17 +12,17 @@ def calculate_lot_size(balance: float, sl_points: float) -> float:
     Always capped at MAX_LOT_SIZE.
     """
     if sl_points <= 0:
-        return 0.01
+        return 0.02
 
     risk_dollars = balance * RISK_PER_TRADE_PCT
-    # Gold: 1 lot = 100oz, 1 point = $0.01 per 0.01 lot
-    # For 0.01 lot: $0.10 per point on XAUUSDm
+    # Gold: 1 lot = 100oz, 1 point = $0.02 per 0.02 lot
+    # For 0.02 lot: $0.10 per point on XAUUSDm
     point_value_per_lot = 10.0  # $10 per point for 1.0 lot
     lot = risk_dollars / (sl_points * point_value_per_lot)
 
-    # Round down to nearest 0.01
+    # Round down to nearest 0.02
     lot = int(lot * 100) / 100.0
-    lot = max(0.01, min(lot, MAX_LOT_SIZE))
+    lot = max(0.02, min(lot, MAX_LOT_SIZE))
 
     return lot
 

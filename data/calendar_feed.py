@@ -103,7 +103,8 @@ class CalendarFeed:
     def _is_stale(self) -> bool:
         if self._last_fetch is None:
             return True
-        return (now_eat() - self._last_fetch).total_seconds() > 900  # 15 min
+        # Cache for 12 hours since economic calendar rarely changes intra-day
+        return (now_eat() - self._last_fetch).total_seconds() > 43200
 
 
 _calendar: Optional[CalendarFeed] = None

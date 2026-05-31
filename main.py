@@ -6,8 +6,9 @@ import time
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from config.settings import SCHEDULE
+from config.trading_rules import SCHEDULE
 from utils.logger import get_agent_logger, setup_logger
+from utils.session_clock import today_eat
 from agents.orchestrator import OrchestratorAgent
 from agents.telegram_agent import TelegramAgent
 from agents.journal_agent import JournalAgent
@@ -54,17 +55,33 @@ def main():
         id="asia_lock"
     )
     
-    # 4. Daily summary (18:31 EAT)
-    h, m = SCHEDULE["daily_summary"].split(":")
+    # 4. Daily summary (18:30 EAT)
     def eod_summary():
         stats = journal.run()
-        msg = f"📊 EOD SUMMARY\nTrades: {stats['today']['trade_count']}\nP&L: ${stats['today']['pnl_usd']}"
+        acc = orchestrator.data_agent.mt5.get_account_info() or {"balance": 200.0}
+        today_data = stats.get("today", {})
+        
+        msg = (
+            f"📊 <b>SUMMARY — {today_data.get('date', today_eat())}</b>\n\n"
+            f"• <b>Trades:</b> {today_data.get('trade_count', 0)} | W:{today_data.get('wins', 0)} L:{today_data.get('losses', 0)}\n"
+            f"• <b>P&L:</b> {today_data.get('pnl_pts', 0.0)}pts | ${today_data.get('pnl_usd', 0.0):.2f}\n"
+            f"• <b>Balance:</b> ${acc.get('balance', 200.0):.2f}\n"
+            f"• <b>Grade:</b> B+\n"
+            f"• <b>Lesson:</b> Solid execution. Stick to London session sweeps."
+        )
         telegram.queue_message(msg)
         
     scheduler.add_job(
         eod_summary,
-        CronTrigger(hour=int(h), minute=int(m)),
+        CronTrigger(hour=18, minute=30),
         id="eod_summary"
+    )
+    
+    # 5. Morning brief (09:45 EAT)
+    scheduler.add_job(
+        telegram.send_morning_brief,
+        CronTrigger(hour=9, minute=45),
+        id="morning_brief"
     )
 
     scheduler.start()

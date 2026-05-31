@@ -1,18 +1,61 @@
 """
 BiasAgent — Aggregates all signals into final directional bias.
-Produces LONG, SHORT, or WAIT with a grade (A+/A/B/C).
+Uses Gemini to provide final scoring and grading based on context.
 """
+from typing import Dict, Any
+import json
 from config.trading_rules import CONFLUENCE_SCORING, GRADE_THRESHOLDS
 from utils.logger import get_agent_logger
+from agents.llm_utils import query_llm_structured, safe_json_dumps
+from agents.state import BiasOutput
 
 log = get_agent_logger("BIAS_AGENT")
 
+PROMPT = """
+NAME: BiasAgent
+ROLE: Confluence scoring and directional bias
+
+YOU ARE:
+The master analyst. You look at the big picture,
+combining structure, liquidity, order blocks,
+and OTE zones to form a singular daily bias.
+You grade setups ruthlessly.
+
+YOUR JOB:
+→ Read outputs from Structure, Liquidity, OB, and OTE agents
+→ Calculate total confluence score (0-10)
+→ Assign a grade (A+, A, B, C)
+→ Determine final direction (LONG/SHORT/WAIT)
+→ Block entry if risk or news says so
+
+CONFLUENCE SCORING:
+HTF Alignment (H4 & H1 match)     +2.0
+Liquidity swept & manipulation    +2.0
+Price inside OTE zone             +2.0
+Valid OB inside OTE zone          +1.5
+Displacement/FVG present          +1.0
+M1/M5 CHoCH confirmed             +1.5
+
+GRADE THRESHOLDS:
+A+ Setup: 9.0 - 10.0
+A  Setup: 8.0 - 8.9
+B  Setup: 7.0 - 7.9
+C  Setup: < 7.0 (DO NOT TRADE)
+
+Output must strictly follow the Pydantic schema provided.
+"""
 
 class BiasAgent:
     def __init__(self, shared_state: dict):
         self.state = shared_state
 
-    def run(self) -> dict:
+    def run(self) -> Dict[str, Any]:
+        # Helper to extract from dict or pydantic model
+        def get_field(obj, field, default=None):
+            if obj is None: return default
+            if isinstance(obj, dict): return obj.get(field, default)
+            return getattr(obj, field, default) if hasattr(obj, field) else default
+
         structure = self.state.get("structure", {})
         liquidity = self.state.get("liquidity", {})
         ote = self.state.get("ote", {})
@@ -21,105 +64,105 @@ class BiasAgent:
         risk = self.state.get("risk", {})
         session = self.state.get("session", {})
 
+        # Build context
+        bias_dict = get_field(structure, "bias", {})
+        h4_bias = bias_dict.get("H4", "NEUTRAL") if isinstance(bias_dict, dict) else "NEUTRAL"
+        h1_bias = bias_dict.get("H1", "NEUTRAL") if isinstance(bias_dict, dict) else "NEUTRAL"
+        
+        asia = get_field(liquidity, "asia_range", {})
+        if not isinstance(asia, dict): asia = {}
+
+        context = {
+            "htf_alignment": {"H4": h4_bias, "H1": h1_bias},
+            "liquidity_swept": get_field(liquidity, "manipulation_detected", False) or asia.get("high_swept", False) or asia.get("low_swept", False),
+            "price_in_ote": get_field(ote, "price_in_ote", False),
+            "ob_in_ote_score": get_field(get_field(ob, "ob_in_ote", {}), "score", 0),
+            "displacement_detected": get_field(get_field(structure, "displacement", {}), "detected", False),
+            "choch_confirmed": get_field(get_field(structure, "choch", {}), "confirmed", False),
+            "session_tradeable": get_field(session, "tradeable", False),
+            "news_block": get_field(news, "block_trading", False),
+            "risk_block": not get_field(risk, "trading_allowed", True),
+            "ote_sl": get_field(ote, "sl", "N/A")
+        }
+
+        # Query LLM
+        try:
+            result = query_llm_structured(
+                system_prompt=PROMPT,
+                user_content=f"Context from agents:\n{safe_json_dumps(context)}\n\nPlease calculate final bias and output the BiasOutput.",
+                output_schema=BiasOutput
+            )
+            
+            output = result.model_dump()
+            self.state["bias_output"] = output
+            
+            log.info(f"Bias: {output['bias']} | Grade: {output['grade']} | Score: {output['score']}/10 | Allowed: {output['entry_allowed']}")
+            return output
+            
+        except Exception as e:
+            log.error(f"LLM Bias parsing failed: {e}")
+            return self._fallback_algorithmic(context, h4_bias, h1_bias)
+
+    def _fallback_algorithmic(self, context, h4_bias, h1_bias):
         score = 0.0
         reasons = []
 
-        # 1. HTF alignment (+2)
-        h4_bias = structure.get("bias", {}).get("H4", "NEUTRAL")
-        h1_bias = structure.get("bias", {}).get("H1", "NEUTRAL")
-        if h4_bias == h1_bias and h4_bias != "NEUTRAL":
+        if context["htf_alignment"]["H4"] == context["htf_alignment"]["H1"] and context["htf_alignment"]["H4"] != "NEUTRAL":
             score += CONFLUENCE_SCORING["htf_aligned"]
-            reasons.append(f"HTF aligned: {h4_bias}")
+            reasons.append(f"HTF aligned")
 
-        # Determine direction from HTF
         direction = h4_bias if h4_bias != "NEUTRAL" else h1_bias
         bias = "WAIT"
-        if direction == "BULLISH":
-            bias = "LONG"
-        elif direction == "BEARISH":
-            bias = "SHORT"
+        if direction == "BULLISH": bias = "LONG"
+        elif direction == "BEARISH": bias = "SHORT"
 
-        # 2. Liquidity swept (+2)
-        manip = liquidity.get("manipulation_detected", False)
-        asia = liquidity.get("asia_range", {})
-        swept = asia.get("high_swept", False) or asia.get("low_swept", False)
-        if manip or swept:
+        if context["liquidity_swept"]:
             score += CONFLUENCE_SCORING["liquidity_swept"]
             reasons.append("Liquidity swept")
 
-        # 3. Price in OTE (+2)
-        if ote.get("price_in_ote", False):
+        if context["price_in_ote"]:
             score += CONFLUENCE_SCORING["price_in_ote"]
-            reasons.append(f"Price in OTE zone")
+            reasons.append("Price in OTE zone")
 
-        # 4. OB in zone (+1)
-        ob_in_ote = ob.get("ob_in_ote")
-        if ob_in_ote and ob_in_ote.get("score", 0) >= 7:
+        if context["ob_in_ote_score"] >= 7:
             score += CONFLUENCE_SCORING["ob_in_zone"]
-            reasons.append(f"OB in zone (score: {ob_in_ote['score']})")
+            reasons.append("OB in zone")
 
-        # 5. FVG check (+1) — simplified, check displacement as proxy
-        displacement = structure.get("displacement", {})
-        if displacement.get("detected", False):
+        if context["displacement_detected"]:
             score += CONFLUENCE_SCORING["fvg_in_zone"]
             reasons.append("Displacement/FVG detected")
 
-        # 6. Volume confirmation (+1)
-        # Would come from volume_skill analysis
-        score += 0  # placeholder — added when volume data available
-
-        # 7. M1/M5 CHoCH (+1)
-        choch = structure.get("choch", {})
-        if choch.get("confirmed", False):
+        if context["choch_confirmed"]:
             score += CONFLUENCE_SCORING["m1_choch"]
-            reasons.append(f"CHoCH confirmed ({choch.get('direction')})")
+            reasons.append("CHoCH confirmed")
 
-        # Grade
         grade = "C"
         for g, threshold in sorted(GRADE_THRESHOLDS.items(), key=lambda x: x[1], reverse=True):
             if score >= threshold:
                 grade = g
                 break
 
-        # Wait conditions
         entry_allowed = True
         wait_reason = None
-
-        if not session.get("tradeable", False):
-            entry_allowed = False
-            wait_reason = f"Session not tradeable: {session.get('session', 'N/A')}"
-        elif news.get("block_trading", False):
-            entry_allowed = False
-            wait_reason = news.get("block_reason", "News block")
-        elif not risk.get("trading_allowed", True):
-            entry_allowed = False
-            wait_reason = risk.get("block_reason", "Risk limit")
+        if not context["session_tradeable"]:
+            entry_allowed, wait_reason = False, "Session not tradeable"
+        elif context["news_block"]:
+            entry_allowed, wait_reason = False, "News block"
+        elif context["risk_block"]:
+            entry_allowed, wait_reason = False, "Risk block"
         elif score < GRADE_THRESHOLDS["B"]:
-            entry_allowed = False
-            wait_reason = f"Low confluence score: {score}/10"
+            entry_allowed, wait_reason = False, f"Low score: {score}"
 
-        if not entry_allowed:
-            bias = "WAIT"
+        if not entry_allowed: bias = "WAIT"
 
-        # Invalidation
         invalidation = ""
-        if ote.get("valid"):
-            if direction == "BULLISH":
-                invalidation = f"Below {ote.get('sl', 'N/A')}"
-            else:
-                invalidation = f"Above {ote.get('sl', 'N/A')}"
+        if context["ote_sl"] != "N/A":
+            invalidation = f"Below {context['ote_sl']}" if direction == "BULLISH" else f"Above {context['ote_sl']}"
 
         output = {
-            "bias": bias,
-            "grade": grade,
-            "score": round(score, 1),
-            "direction": direction,
-            "reasons": reasons,
-            "invalidation": invalidation,
-            "entry_allowed": entry_allowed,
-            "wait_reason": wait_reason,
+            "bias": bias, "grade": grade, "score": round(score, 1),
+            "direction": direction, "reasons": reasons, "invalidation": invalidation,
+            "entry_allowed": entry_allowed, "wait_reason": wait_reason,
         }
-
         self.state["bias_output"] = output
-        log.info(f"Bias: {bias} | Grade: {grade} | Score: {score}/10 | Allowed: {entry_allowed}")
         return output

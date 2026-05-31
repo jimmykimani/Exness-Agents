@@ -240,8 +240,8 @@ class MT5Connector:
             })
         return result
 
-    def close_position(self, ticket: int) -> Optional[dict]:
-        """Close a specific position by ticket."""
+    def close_position(self, ticket: int, volume: Optional[float] = None) -> Optional[dict]:
+        """Close a specific position by ticket (supports partial closure)."""
         if not self.ensure_connected():
             return {"status": "ERROR", "error": "MT5 not connected"}
 
@@ -253,10 +253,16 @@ class MT5Connector:
         close_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY
         price = mt5.symbol_info_tick(SYMBOL).bid if pos.type == mt5.ORDER_TYPE_BUY else mt5.symbol_info_tick(SYMBOL).ask
 
+        # Support partial volume closing
+        close_vol = volume if volume is not None else pos.volume
+        # Prevent trying to close more than available volume
+        if close_vol > pos.volume:
+            close_vol = pos.volume
+
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": SYMBOL,
-            "volume": pos.volume,
+            "volume": close_vol,
             "type": close_type,
             "position": ticket,
             "price": price,

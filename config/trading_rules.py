@@ -10,13 +10,13 @@ These are the HARD RULES that protect Jimmy's capital.
 STARTING_BALANCE = 192.0  # USD
 
 # ═══════════════════════════════════════════════════════
-# RISK MANAGEMENT — NEVER NEGOTIABLE
+# RISK MANAGEMENT — AGGRESSIVE MODE
 # ═══════════════════════════════════════════════════════
-RISK_PER_TRADE_PCT = 0.01        # 1% per trade
-MAX_LOT_SIZE = 0.01              # absolute cap
-MAX_TRADES_PER_DAY = 2
-DAILY_LOSS_LIMIT_PCT = 0.03      # 3%
-WEEKLY_LOSS_LIMIT_PCT = 0.05     # 5%
+RISK_PER_TRADE_PCT = 0.05        # 5% per trade (aggressive)
+MAX_LOT_SIZE = 0.10              # allow up to 0.10 lots
+MAX_TRADES_PER_DAY = 6
+DAILY_LOSS_LIMIT_PCT = 0.10      # 10% daily loss limit
+WEEKLY_LOSS_LIMIT_PCT = 0.15     # 15% weekly loss limit
 MAX_SPREAD_POINTS = 5.0          # reject if spread > 5
 
 # ═══════════════════════════════════════════════════════
@@ -25,22 +25,22 @@ MAX_SPREAD_POINTS = 5.0          # reject if spread > 5
 SESSIONS = {
     "ASIA": {
         "start": "01:00",
-        "end": "09:00",
-        "tradeable": False,  # observation only
+        "end": "09:59",
+        "tradeable": True,
     },
     "LONDON": {
         "start": "10:00",
-        "end": "12:00",
+        "end": "15:59",
         "tradeable": True,
     },
-    "DEAD_ZONE": {
-        "start": "12:00",
-        "end": "16:30",
-        "tradeable": False,
-    },
     "NEW_YORK": {
-        "start": "16:30",
-        "end": "18:30",
+        "start": "16:00",
+        "end": "23:59",
+        "tradeable": True,
+    },
+    "LATE_NY": {
+        "start": "00:00",
+        "end": "00:59",
         "tradeable": True,
     },
 }
@@ -131,10 +131,10 @@ CONFLUENCE_SCORING = {
 # SETUP GRADING
 # ═══════════════════════════════════════════════════════
 GRADE_THRESHOLDS = {
-    "A+": 9,   # auto-execute if enabled
-    "A":  7,   # alert Jimmy + await approval
-    "B":  5,   # alert only, no execution
-    "C":  0,   # log only, no alert
+    "A+": 9,   # auto-execute immediately
+    "A":  7,   # auto-execute (aggressive mode)
+    "B":  5,   # auto-execute + alert Jimmy
+    "C":  0,   # alert only, no execution
 }
 
 # ═══════════════════════════════════════════════════════
