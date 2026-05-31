@@ -1,0 +1,53 @@
+# ═══════════════════════════════════════
+# Jimmy's Gold Trading Bot — Dependencies
+# ═══════════════════════════════════════
+
+# Broker Connection
+MetaTrader5>=5.0.45
+
+# Agent Framework
+langgraph>=0.2.0
+langchain>=0.3.0
+# LLM Backends
+langchain-google-genai>=2.0.0
+google-generativeai>=0.8.0
+
+# Data & Calculations
+pandas>=2.2.0
+numpy>=1.26.0
+ta>=0.11.0
+
+# Caching
+redis>=5.0.0
+
+# Database
+psycopg2-binary>=2.9.9
+supabase>=2.0.0
+
+# Scheduling
+APScheduler>=3.10.4
+
+# Telegram
+python-telegram-bot>=21.0
+
+# News / Calendar
+feedparser>=6.0.11
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+
+# API Framework
+fastapi>=0.115.0
+uvicorn>=0.32.0
+
+# Logging & Monitoring
+loguru>=0.7.2
+sentry-sdk>=2.0.0
+
+# Timezone
+pytz>=2024.1
+
+# Environment
+python-dotenv>=1.0.1
+
+# Async
+aiohttp>=3.10.0
