@@ -124,23 +124,11 @@ class EntryAgent:
             }
         }
 
-        try:
-            result = query_llm_structured(
-                system_prompt=PROMPT,
-                user_content=f"Context from programmatic calculation:\n{safe_json_dumps(context)}\n\nPlease finalize the EntryOutput.",
-                output_schema=EntryOutput
-            )
-            output = result.model_dump()
-            self.state["trade_params"] = output
-            log.info(
-                f"Entry params — Exec: {output['execute']} | Dir: {output['direction']} | "
-                f"Entry: {output['entry']} | SL: {output['sl']} | Lot: {output['lot']}"
-            )
-            return output
-
-        except Exception as e:
-            log.error(f"LLM Entry parsing failed: {e}")
-            fallback = context["programmatic_calculation"]
-            self.state["trade_params"] = fallback
-            return fallback
+        output = context["programmatic_calculation"]
+        self.state["trade_params"] = output
+        log.info(
+            f"Entry params — Exec: {output['execute']} | Dir: {output['direction']} | "
+            f"Entry: {output['entry']} | SL: {output['sl']} | Lot: {output['lot']}"
+        )
+        return output
 

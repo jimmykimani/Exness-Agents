@@ -18,6 +18,7 @@ MAX_TRADES_PER_DAY = 6
 DAILY_LOSS_LIMIT_PCT = 0.10      # 10% daily loss limit
 WEEKLY_LOSS_LIMIT_PCT = 0.15     # 15% weekly loss limit
 MAX_SPREAD_POINTS = 5.0          # reject if spread > 5
+MIN_VOLATILITY_POINTS = 2.0      # minimum movement to trigger LLM analysis
 
 # ═══════════════════════════════════════════════════════
 # SESSION WINDOWS (EAT = UTC+3)
@@ -26,7 +27,7 @@ SESSIONS = {
     "ASIA": {
         "start": "01:00",
         "end": "09:59",
-        "tradeable": True,
+        "tradeable": False,
     },
     "LONDON": {
         "start": "10:00",

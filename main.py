@@ -32,10 +32,10 @@ def main():
     # Set up the scheduler
     scheduler = BackgroundScheduler()
 
-    # 1. 5-minute analysis cycle (runs at :00, :05, :10, etc.)
+    # 1. 15-minute analysis cycle (runs at :00, :15, :30, :45)
     scheduler.add_job(
         orchestrator.run_cycle,
-        CronTrigger(minute="*/5"),
+        CronTrigger(minute="*/15"),
         id="analysis_cycle"
     )
     

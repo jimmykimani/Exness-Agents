@@ -1,0 +1,14 @@
+[
+  {
+    "trade_id": "441a9b9f-0f60-4578-b022-c6b70d27e976",
+    "date": "2026-05-31",
+    "ticket": 2797028679,
+    "direction": "BULLISH",
+    "entry": 4520.47,
+    "sl": 4506.88,
+    "tp3": 4660.77,
+    "pnl_usd": 10.0,
+    "pnl_pts": 0.0,
+    "grade": "C"
+  }
+]
