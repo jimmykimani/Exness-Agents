@@ -1,4 +1,3 @@
-# 🤖 Jimmy's Gold Trading Automation System
 
 This is a 14-agent automated trading system for XAUUSD on Exness MT5, following ICT/SMC institutional methodologies. The system uses LangGraph for orchestration and leverages Google Gemini for decision making.
 
